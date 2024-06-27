@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Frontend;
 use App\Models\User;
 use App\Models\Project;
 use Illuminate\Http\Request;
+use App\Mail\ForemanAddedToProject;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Session;
 
 class CustomerController extends Controller
@@ -22,7 +24,6 @@ class CustomerController extends Controller
     }
     public function store(Request $request)
     {
-        // dd($request->all());
         $validated = $request->validate([
             'name' => 'required',
             'email' => 'required|email|unique:users,email',
@@ -31,28 +32,33 @@ class CustomerController extends Controller
             'foreman_id' => 'required',
         ]);
 
-         // Check if the email already exists
-         if (user::where('email', $request->input('email'))->exists()) {
+        if (User::where('email', $request->input('email'))->exists()) {
             return redirect()->back()->withErrors(['email' => 'The email has already been taken.'])->withInput();
         }
 
         $user = User::create([
-            'name'=>$request->input('name'),
-            'email'=>$request->input('email'),
+            'name' => $request->input('name'),
+            'email' => $request->input('email'),
             'email_verified_at' => now(),
-            'password'=> Hash::make('password'),
-            'is_active' =>  $request->has('is_active') ? 1 : 0,
+            'password' => Hash::make('password'),
+            'is_active' => $request->has('is_active') ? 1 : 0,
             'role' => 'customer',
         ]);
-            // Add more fields as needed
-            if($user->save()){
-                $project = Project::create([
-                    'name'=>$request->input('project_name'),
-                    'user_id' => $user->id,
-                    'foreman_id' => $request->input('foreman_id'),
-                    'address' => $request->input('project_address'),
-                ]);
-            }
+
+        if ($user->save()) {
+            $project = Project::create([
+                'name' => $request->input('project_name'),
+                'user_id' => $user->id,
+                'foreman_id' => $request->input('foreman_id'),
+                'address' => $request->input('project_address'),
+            ]);
+
+            // Retrieve the foreman details
+            $foreman = User::find($request->input('foreman_id'));
+
+            // Send email to the foreman
+            Mail::to($foreman->email)->send(new ForemanAddedToProject($project, $foreman));
+        }
 
         Session::flash('message', 'Created successfully!');
         Session::flash('alert-class', 'alert-success');

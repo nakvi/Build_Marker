@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Frontend;
 use App\Models\User;
 use App\Models\Project;
 use Illuminate\Http\Request;
-use App\Http\Controllers\Controller;
 use App\Models\ProjectImages;
+use App\Mail\ForemanAddedToProject;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Session;
 
 class ProjectController extends Controller
@@ -34,6 +36,11 @@ class ProjectController extends Controller
                 'foreman_id' => $request->input('foreman_id'),
 
         ]);
+         // Retrieve the foreman details
+         $foreman = User::find($request->input('foreman_id'));
+
+         // Send email to the foreman
+         Mail::to($foreman->email)->send(new ForemanAddedToProject($project, $foreman));
         Session::flash('message', 'Created successfully!');
         Session::flash('alert-class', 'alert-success');
         return redirect()->back();
